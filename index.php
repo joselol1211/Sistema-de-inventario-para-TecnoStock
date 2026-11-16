@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TecnoStock - Iniciar Sesión</title>
-    <!-- Enlace a Bootstrap 5 (vía CDN) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light d-flex align-items-center justify-content-center" style="height: 100vh;">
@@ -17,7 +16,6 @@
                         <h3 class="text-center mb-4">TecnoStock</h3>
                         <p class="text-center text-muted mb-4">Ingresa tus credenciales para acceder al inventario</p>
                         
-                        <!-- El formulario enviará los datos mediante POST -->
                         <form action="validar_login.php" method="POST" id="formLogin">
                             
                             <div class="mb-3">
@@ -34,10 +32,19 @@
                                 <button type="submit" class="btn btn-primary btn-lg">Iniciar Sesión</button>
                             </div>
 
-                            <!-- Espacio para mostrar alertas de error (ej. credenciales incorrectas) -->
-                            <div id="alertaError" class="alert alert-danger mt-3 d-none" role="alert">
-                                Correo o contraseña incorrectos.
-                            </div>
+                            
+                            <?php if (isset($_GET['error'])): ?>
+                                <div class="alert alert-danger mt-3 text-center" role="alert">
+                                    <?php 
+                                        if ($_GET['error'] == 'credenciales') {
+                                            echo "Correo o contraseña incorrectos.";
+                                        } elseif ($_GET['error'] == 'inactivo') {
+                                            echo "Tu cuenta se encuentra desactivada. Contacta al administrador.";
+                                        }
+                                    ?>
+                                </div>
+                            <?php endif; ?>
+
                         </form>
                     </div>
                 </div>
@@ -45,7 +52,19 @@
         </div>
     </div>
 
-    <!-- Scripts de Bootstrap (Opcional para interactividad) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    
+    <script>
+        document.getElementById('formLogin').addEventListener('submit', function(e) {
+            const correo = document.getElementById('correo').value.trim();
+            const clave = document.getElementById('clave').value.trim();
+
+            if (correo === '' || clave === '') {
+                e.preventDefault();
+                alert('Por favor, completa todos los campos sin dejar espacios en blanco.');
+            }
+        });
+    </script>
 </body>
 </html>
