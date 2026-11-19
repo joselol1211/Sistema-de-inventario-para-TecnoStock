@@ -8,10 +8,11 @@ if (!isset($_SESSION['id_usuario'])) {
 
 require_once 'conexion.php';
 
-$stmtCat =$conexion->query("SELECT id_categoria, nombre FROM Categoria WHERE estado = 'Activo'");
-$categorias =$stmtCat->fetchAll(PDO::FETCH_ASSOC);
+$stmtCat = $conexion->query("SELECT id_categoria, nombre FROM Categoria WHERE estado = 'Activo'");
+$categorias = $stmtCat->fetchAll(PDO::FETCH_ASSOC);
 
-$busqueda = isset($_GET['buscar']) ? trim($_GET['buscar']) : '';$categoria_filtro = isset($_GET['categoria']) ?$_GET['categoria'] : '';
+$busqueda = isset($_GET['buscar']) ? trim($_GET['buscar']) : '';
+$categoria_filtro = isset($_GET['categoria']) ? $_GET['categoria'] : '';
 
 $sql = "SELECT p.*, c.nombre AS nombre_categoria 
         FROM Producto p 
@@ -20,29 +21,34 @@ $sql = "SELECT p.*, c.nombre AS nombre_categoria
 
 $parametros = [];
 
-if ($busqueda !== '') {$sql .= " AND (p.nombre LIKE :busqueda OR p.codigo LIKE :busqueda)";
-    $parametros[':busqueda'] = "\%$busqueda%";
+if ($busqueda !== '') {
+    $sql .= " AND (p.nombre LIKE :busqueda OR p.codigo LIKE :busqueda)";
+    $parametros[':busqueda'] = "%$busqueda%";
 }
 
-if ($categoria_filtro !== '') {$sql .= " AND p.id_categoria = :categoria";
-    $parametros[':categoria'] =$categoria_filtro;
+if ($categoria_filtro !== '') {
+    $sql .= " AND p.id_categoria = :categoria";
+    $parametros[':categoria'] = $categoria_filtro;
 }
 
 $sql .= " ORDER BY p.estado ASC, p.nombre ASC";
 
 $stmtProd = $conexion->prepare($sql);
 $stmtProd->execute($parametros);
-$productos =$stmtProd->fetchAll(PDO::FETCH_ASSOC);
+$productos = $stmtProd->fetchAll(PDO::FETCH_ASSOC);
 
 $total_activos = 0;
 $total_alertas = 0;
 $unidades_totales = 0;
 $valor_inventario = 0;
 
-foreach ($productos as$p) {
+foreach ($productos as $p) {
     if ($p['estado'] === 'Activo') {
-        $total_activos++;$unidades_totales += $p['stock_actual'];$valor_inventario += ($p['stock_actual'] *$p['precio']);
-        if ($p['stock_actual'] < $p['stock_minimo']) {$total_alertas++;
+        $total_activos++;
+        $unidades_totales += $p['stock_actual'];
+        $valor_inventario += ($p['stock_actual'] * $p['precio']);
+        if ($p['stock_actual'] < $p['stock_minimo']) {
+            $total_alertas++;
         }
     }
 }
@@ -158,6 +164,9 @@ foreach ($productos as$p) {
             <a href="movimientos.php" class="nav-link-custom">
                 <i class="bi bi-clock-history"></i> Historial Movimientos
             </a>
+            <a href="usuarios.php" class="nav-link-custom">
+                <i class="bi bi-people-fill"></i> Gestión Usuarios
+            </a>
         </div>
 
         <div class="p-3 border-top border-white border-opacity-10">
@@ -239,8 +248,8 @@ foreach ($productos as$p) {
             <div class="col-md-4">
                 <select name="categoria" class="form-select">
                     <option value="">Todas las categorías</option>
-                    <?php foreach ($categorias as$cat): ?>
-                        <option value="<?php echo $cat['id_categoria']; ?>" <?php if ($categoria_filtro ==$cat['id_categoria']) echo 'selected'; ?>>
+                    <?php foreach ($categorias as $cat): ?>
+                        <option value="<?php echo $cat['id_categoria']; ?>" <?php if ($categoria_filtro == $cat['id_categoria']) echo 'selected'; ?>>
                             <?php echo htmlspecialchars($cat['nombre']); ?>
                         </option>
                     <?php endforeach; ?>
@@ -248,7 +257,7 @@ foreach ($productos as$p) {
             </div>
             <div class="col-md-2 d-flex gap-2">
                 <button type="submit" class="btn btn-dark w-100">Buscar</button>
-                <?php if ($busqueda !== '' or$categoria_filtro !== ''): ?>
+                <?php if ($busqueda !== '' or $categoria_filtro !== ''): ?>
                     <a href="panel.php" class="btn btn-outline-secondary" title="Limpiar"><i class="bi bi-arrow-counterclockwise"></i></a>
                 <?php endif; ?>
             </div>
@@ -270,7 +279,7 @@ foreach ($productos as$p) {
                     </thead>
                     <tbody>
                         <?php if (count($productos) > 0): ?>
-                            <?php foreach ($productos as$prod): ?>
+                            <?php foreach ($productos as $prod): ?>
                                 <?php 
                                     $bajo_stock = ($prod['stock_actual'] < $prod['stock_minimo']) and ($prod['estado'] === 'Activo');
                                 ?>

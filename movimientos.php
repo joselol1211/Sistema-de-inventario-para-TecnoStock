@@ -156,6 +156,9 @@ foreach ($movimientos as $m) {
             <a href="movimientos.php" class="nav-link-custom active">
                 <i class="bi bi-clock-history"></i> Historial Movimientos
             </a>
+            <a href="usuarios.php" class="nav-link-custom">
+                <i class="bi bi-people-fill"></i> Gestión Usuarios
+            </a>
         </div>
 
         <div class="p-3 border-top border-white border-opacity-10">

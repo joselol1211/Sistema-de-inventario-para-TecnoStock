@@ -15,7 +15,6 @@ if (!isset($_GET['id']) or !is_numeric($_GET['id'])) {
 
 $id_producto = (int)$_GET['id'];
 
-// Obtener datos actuales del producto
 $stmtProd = $conexion->prepare("SELECT * FROM Producto WHERE id_producto = :id");
 $stmtProd->execute([':id' => $id_producto]);
 $producto = $stmtProd->fetch(PDO::FETCH_ASSOC);
@@ -25,7 +24,6 @@ if (!$producto) {
     exit();
 }
 
-// Obtener categorías activas
 $stmtCat = $conexion->query("SELECT id_categoria, nombre FROM Categoria WHERE estado = 'Activo' ORDER BY nombre ASC");
 $categorias = $stmtCat->fetchAll(PDO::FETCH_ASSOC);
 
@@ -49,7 +47,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $errores[] = "El stock mínimo no puede ser negativo.";
     }
 
-    // Verificar que el código SKU no esté repetido en OTRO producto distinto
     if (empty($errores)) {
         $stmtCheck = $conexion->prepare("SELECT COUNT(*) FROM Producto WHERE codigo = :codigo AND id_producto != :id");
         $stmtCheck->execute([':codigo' => $codigo, ':id' => $id_producto]);
@@ -87,7 +84,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $errores[] = "Error al actualizar en la base de datos: " . $e->getMessage();
         }
     } else {
-        // Mantener los datos ingresados en el formulario si hubo error
         $producto['codigo'] = $codigo;
         $producto['nombre'] = $nombre;
         $producto['descripcion'] = $descripcion;
@@ -217,6 +213,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </a>
             <a href="movimientos.php" class="nav-link-custom">
                 <i class="bi bi-clock-history"></i> Historial Movimientos
+            </a>
+            <a href="usuarios.php" class="nav-link-custom">
+                <i class="bi bi-people-fill"></i> Gestión Usuarios
             </a>
         </div>
 
