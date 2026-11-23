@@ -19,15 +19,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error = "Por favor, completa todos los campos.";
     } else {
         try {
-            $stmt = $conexion->prepare("SELECT id_usuario, nombre, correo, clave FROM Usuario WHERE correo = :correo LIMIT 1");
+            // Traemos también la columna 'estado' para validar si está habilitado
+            $stmt = $conexion->prepare("SELECT id_usuario, nombre, correo, clave, estado FROM Usuario WHERE correo = :correo LIMIT 1");
             $stmt->execute([':correo' => $correo]);
             $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($usuario and (password_verify($clave, $usuario['clave']) or $clave === $usuario['clave'])) {
-                $_SESSION['id_usuario'] = $usuario['id_usuario'];
-                $_SESSION['nombre'] = $usuario['nombre'];
-                header("Location: panel.php");
-                exit();
+                
+                // BLOQUEO SI EL USUARIO ESTÁ INACTIVO
+                if ($usuario['estado'] !== 'Activo') {
+                    $error = "Tu cuenta se encuentra desactivada. Contacta al administrador.";
+                } else {
+                    $_SESSION['id_usuario'] = $usuario['id_usuario'];
+                    $_SESSION['nombre'] = $usuario['nombre'];
+                    header("Location: panel.php");
+                    exit();
+                }
+
             } else {
                 $error = "Correo electrónico o contraseña incorrectos.";
             }
@@ -78,7 +86,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             overflow: hidden;
             min-height: 460px;
         }
-        /* Resplandor suave detrás del logo */
         .brand-panel::before {
             content: "";
             position: absolute;
@@ -173,7 +180,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="login-container">
         <div class="row g-0">
             
-            <!-- Columna Izquierda: Solo el Logo en grande -->
+            <!-- Columna Izquierda: Logo en grande -->
             <div class="col-md-6 brand-panel">
                 <div>
                     <div class="logo-box">
