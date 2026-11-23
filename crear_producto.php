@@ -12,18 +12,23 @@ $stmtCat = $conexion->query("SELECT id_categoria, nombre FROM Categoria WHERE es
 $categorias = $stmtCat->fetchAll(PDO::FETCH_ASSOC);
 
 $errores = [];
+$modo_nueva_cat = isset($_POST['nueva_categoria']) && trim($_POST['nueva_categoria']) !== '';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $codigo = strtoupper(trim($_POST['codigo']));
     $nombre = trim($_POST['nombre']);
     $descripcion = trim($_POST['descripcion']);
-    $id_categoria = $_POST['id_categoria'];
+    $id_categoria = $_POST['id_categoria'] ?? '';
+    $nueva_categoria = trim($_POST['nueva_categoria'] ?? '');
     $precio = $_POST['precio'];
     $stock_actual = $_POST['stock_actual'];
     $stock_minimo = $_POST['stock_minimo'];
 
-    if ($codigo === '' or $nombre === '' or $id_categoria === '') {
-        $errores[] = "El código, el nombre y la categoría son obligatorios.";
+    if ($codigo === '' or $nombre === '') {
+        $errores[] = "El código y el nombre del producto son obligatorios.";
+    }
+    if ($id_categoria === '' and $nueva_categoria === '') {
+        $errores[] = "Debes seleccionar una categoría existente o escribir el nombre de una nueva.";
     }
     if (!is_numeric($precio) or $precio < 0) {
         $errores[] = "El precio debe ser un número mayor o igual a 0.";
@@ -42,6 +47,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (empty($errores)) {
         try {
+            $conexion->beginTransaction();
+
+            // Si el usuario escribió una nueva categoría, crearla o reutilizarla
+            if ($nueva_categoria !== '') {
+                $stmtBuscarCat = $conexion->prepare("SELECT id_categoria, estado FROM Categoria WHERE LOWER(nombre) = LOWER(:nombre) LIMIT 1");
+                $stmtBuscarCat->execute([':nombre' => $nueva_categoria]);
+                $catExistente = $stmtBuscarCat->fetch(PDO::FETCH_ASSOC);
+
+                if ($catExistente) {
+                    $id_categoria = $catExistente['id_categoria'];
+                    if ($catExistente['estado'] !== 'Activo') {
+                        $stmtAct = $conexion->prepare("UPDATE Categoria SET estado = 'Activo' WHERE id_categoria = :id");
+                        $stmtAct->execute([':id' => $id_categoria]);
+                    }
+                } else {
+                    $stmtInsCat = $conexion->prepare("INSERT INTO Categoria (nombre, estado) VALUES (:nombre, 'Activo')");
+                    $stmtInsCat->execute([':nombre' => $nueva_categoria]);
+                    $id_categoria = $conexion->lastInsertId();
+                }
+            }
+
             $sql = "INSERT INTO Producto (codigo, nombre, descripcion, precio, stock_actual, stock_minimo, estado, id_categoria) 
                     VALUES (:codigo, :nombre, :descripcion, :precio, :stock_actual, :stock_minimo, 'Activo', :id_categoria)";
             
@@ -56,10 +82,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 ':id_categoria' => $id_categoria
             ]);
 
-            header("Location: panel.php?mensaje=" . urlencode("Producto '$nombre' registrado exitosamente."));
+            $conexion->commit();
+
+            $msgExtra = ($nueva_categoria !== '') ? " (Categoría '$nueva_categoria' creada)" : "";
+            header("Location: panel.php?mensaje=" . urlencode("Producto '$nombre' registrado exitosamente.$msgExtra"));
             exit();
 
         } catch (PDOException $e) {
+            $conexion->rollBack();
             $errores[] = "Error al guardar en la base de datos: " . $e->getMessage();
         }
     }
@@ -258,16 +288,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="id_categoria" class="form-label small fw-bold text-secondary">CATEGORÍA *</label>
-                                <select class="form-select" id="id_categoria" name="id_categoria" required>
-                                    <option value="">Selecciona una categoría...</option>
-                                    <?php foreach ($categorias as $cat): ?>
-                                        <option value="<?php echo $cat['id_categoria']; ?>" <?php echo (isset($_POST['id_categoria']) && $_POST['id_categoria'] == $cat['id_categoria']) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($cat['nombre']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label for="id_categoria" class="form-label small fw-bold text-secondary mb-0">CATEGORÍA *</label>
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" id="btnToggleCategoria">
+                                        <i class="bi bi-plus-circle me-1"></i><span id="textoToggleCat"><?php echo $modo_nueva_cat ? 'Elegir existente' : 'Nueva categoría'; ?></span>
+                                    </button>
+                                </div>
+
+                                <!-- Selector de categorías existentes -->
+                                <div id="boxSelectCat" class="<?php echo $modo_nueva_cat ? 'd-none' : ''; ?>">
+                                    <select class="form-select" id="id_categoria" name="id_categoria" <?php echo $modo_nueva_cat ? '' : 'required'; ?>>
+                                        <option value="">Selecciona una categoría...</option>
+                                        <?php foreach ($categorias as $cat): ?>
+                                            <option value="<?php echo $cat['id_categoria']; ?>" <?php echo (isset($_POST['id_categoria']) && $_POST['id_categoria'] == $cat['id_categoria']) ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($cat['nombre']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <!-- Input para crear una nueva categoría al vuelo -->
+                                <div id="boxNuevaCat" class="<?php echo $modo_nueva_cat ? '' : 'd-none'; ?>">
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-primary bg-opacity-10 text-primary border-primary border-opacity-25"><i class="bi bi-tag-fill"></i></span>
+                                        <input type="text" class="form-control border-primary border-opacity-50" id="nueva_categoria" name="nueva_categoria" placeholder="Ej: Mousepads, Monitores..." value="<?php echo isset($_POST['nueva_categoria']) ? htmlspecialchars($_POST['nueva_categoria']) : ''; ?>" <?php echo $modo_nueva_cat ? 'required' : ''; ?>>
+                                    </div>
+                                    <div class="form-text text-primary small">Se guardará automáticamente en el catálogo.</div>
+                                </div>
                             </div>
+
                             <div class="col-md-6">
                                 <label for="precio" class="form-label small fw-bold text-secondary">PRECIO UNITARIO (CLP) *</label>
                                 <div class="input-group">
@@ -351,16 +400,50 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         const inputCodigo = document.getElementById('codigo');
         const inputNombre = document.getElementById('nombre');
         const selectCat = document.getElementById('id_categoria');
+        const inputNuevaCat = document.getElementById('nueva_categoria');
+        const btnToggleCat = document.getElementById('btnToggleCategoria');
+        const textoToggleCat = document.getElementById('textoToggleCat');
+        const boxSelectCat = document.getElementById('boxSelectCat');
+        const boxNuevaCat = document.getElementById('boxNuevaCat');
         const inputPrecio = document.getElementById('precio');
         const inputActual = document.getElementById('stock_actual');
         const inputMinimo = document.getElementById('stock_minimo');
+
+        let creandoCategoria = <?php echo $modo_nueva_cat ? 'true' : 'false'; ?>;
+
+        btnToggleCat.addEventListener('click', function () {
+            creandoCategoria = !creandoCategoria;
+            if (creandoCategoria) {
+                boxSelectCat.classList.add('d-none');
+                boxNuevaCat.classList.remove('d-none');
+                selectCat.removeAttribute('required');
+                selectCat.value = '';
+                inputNuevaCat.setAttribute('required', 'required');
+                textoToggleCat.textContent = 'Elegir existente';
+                inputNuevaCat.focus();
+            } else {
+                boxNuevaCat.classList.add('d-none');
+                boxSelectCat.classList.remove('d-none');
+                inputNuevaCat.removeAttribute('required');
+                inputNuevaCat.value = '';
+                selectCat.setAttribute('required', 'required');
+                textoToggleCat.textContent = 'Nueva categoría';
+            }
+            actualizarVistaPrevia();
+        });
 
         function actualizarVistaPrevia() {
             document.getElementById('prevCodigo').textContent = '#' + (inputCodigo.value.trim().toUpperCase() || 'SIN-CODIGO');
             document.getElementById('prevNombre').textContent = inputNombre.value.trim() || 'Nombre del Producto';
             
-            const catTexto = selectCat.options[selectCat.selectedIndex]?.text || 'Sin categoría';
-            document.getElementById('prevCategoria').textContent = selectCat.value ? catTexto : 'Sin categoría';
+            const prevCatEl = document.getElementById('prevCategoria');
+            if (creandoCategoria) {
+                const nuevaTxt = inputNuevaCat.value.trim();
+                prevCatEl.textContent = nuevaTxt ? (nuevaTxt + ' (Nueva)') : 'Nueva categoría...';
+            } else {
+                const catTexto = selectCat.options[selectCat.selectedIndex]?.text || 'Sin categoría';
+                prevCatEl.textContent = selectCat.value ? catTexto : 'Sin categoría';
+            }
 
             const precioVal = parseInt(inputPrecio.value) || 0;
             document.getElementById('prevPrecio').textContent = '$' + precioVal.toLocaleString('es-CL');
@@ -381,7 +464,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
 
-        [inputCodigo, inputNombre, selectCat, inputPrecio, inputActual, inputMinimo].forEach(el => {
+        [inputCodigo, inputNombre, selectCat, inputNuevaCat, inputPrecio, inputActual, inputMinimo].forEach(el => {
             el.addEventListener('input', actualizarVistaPrevia);
             el.addEventListener('change', actualizarVistaPrevia);
         });
